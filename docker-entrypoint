@@ -1,0 +1,52 @@
+#!/bin/bash -ex
+
+if [ -z "$API_PASSWORD" ]
+then
+   API_PASSWORD=$(dd if=/dev/urandom bs=18 count=1 2>/dev/null | base64)
+   echo "API_PASSWORD:" $API_PASSWORD
+fi
+
+if [ -z "$ADMIN_PASSWORD" ]
+then
+   ADMIN_PASSWORD=$(dd if=/dev/urandom bs=18 count=1 2>/dev/null | base64)
+   echo "ADMIN_PASSWORD:" $ADMIN_PASSWORD
+fi
+
+nut-scanner > /etc/nut/ups.conf
+
+cat > /etc/nut/upsd.conf <<EOF
+ALLOW_NOT_ALL_LISTENERS true
+LISTEN 0.0.0.0 3493
+EOF
+
+cat > /etc/nut/upsd.users <<EOF
+[admin]
+        password = $ADMIN_PASSWORD
+        actions = set
+        actions = fsd
+        instcmds = all
+
+[monitor]
+        password = $API_PASSWORD
+        upsmon master
+EOF
+
+# upsmon settings shared across all UPSes
+cat > /etc/nut/upsmon.conf <<EOF
+SHUTDOWNCMD "$SHUTDOWN_CMD"
+EOF
+
+# upsmon settings per-UPS
+for upsnum in $(seq $UPS_COUNT)
+do
+cat >> /etc/nut/upsmon.conf <<EOF
+MONITOR nutdev-usb$upsnum@localhost 1 monitor $API_PASSWORD primary
+EOF
+done
+
+chgrp -R nut /etc/nut /dev/bus/usb
+chmod -R o-rwx /etc/nut
+
+/usr/sbin/upsdrvctl start
+/usr/sbin/upsd
+exec /usr/sbin/upsmon -D
