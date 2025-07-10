@@ -15,7 +15,6 @@ fi
 nut-scanner > /etc/nut/ups.conf
 
 cat > /etc/nut/upsd.conf <<EOF
-ALLOW_NOT_ALL_LISTENERS true
 LISTEN 0.0.0.0 3493
 EOF
 
